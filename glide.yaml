@@ -1,0 +1,5 @@
+package: github.com/utahta/go-twitter
+import:
+- package: github.com/garyburd/go-oauth
+- package: github.com/pkg/errors
+  version: ^0.8.0
