@@ -1,4 +1,4 @@
-package twitter
+package types
 
 // https://dev.twitter.com/overview/api/entities#entities
 type Entities struct {
