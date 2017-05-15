@@ -5,6 +5,7 @@ Go client library for the [Twitter REST APIs v1.1](https://dev.twitter.com/rest/
 ## Features
 
 - [POST statuses/update](https://dev.twitter.com/rest/reference/post/statuses/update)
+- [POST media/upload](https://dev.twitter.com/rest/reference/post/media/upload)
 
 ...Maybe
 

@@ -37,6 +37,7 @@ func SetConsumerCredentials(consumerKey, consumerSecret string) {
 
 func New(accessToken, accessTokenSecret string, options ...ClientOption) (*Client, error) {
 	c := &Client{
+		HTTPClient: &http.Client{},
 		Credentials: &oauth.Credentials{
 			Token:  accessToken,
 			Secret: accessTokenSecret,
