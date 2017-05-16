@@ -1,4 +1,4 @@
 
 install:
-	@glide install
+	@dep ensure
 

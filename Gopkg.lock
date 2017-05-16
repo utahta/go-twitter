@@ -1,0 +1,25 @@
+memo = "4275bacddcb94f1b8e28814a3da3300215908b68690d9525b14e585f546abb7e"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/garyburd/go-oauth"
+  packages = ["oauth"]
+  revision = "4f191fd0442e75c0c73bd00e4f5f27d4c08312ee"
+
+[[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "34057069f4ab13dc4433c68d368737ebeafcccdc"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sync"
+  packages = ["errgroup"]
+  revision = "57af736625aaa69dfa099432bb67e0808eef3bcc"
