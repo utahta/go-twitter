@@ -33,9 +33,9 @@ func (c *Client) TweetImageURLs(msg string, urlsStr []string, v url.Values) (*ty
 	return c.Tweet(msg, v)
 }
 
-func (c *Client) TweetImages(msg string, dataList [][]byte, v url.Values) (*types.Tweets, error) {
+func (c *Client) TweetImages(msg string, images [][]byte, v url.Values) (*types.Tweets, error) {
 	v = makeValues(v)
-	medias, err := c.UploadMediaImages(dataList)
+	medias, err := c.UploadMediaImages(images)
 	if err != nil {
 		return nil, err
 	}

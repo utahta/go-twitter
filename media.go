@@ -59,17 +59,17 @@ func (c *Client) UploadMediaImageURL(urlStr string) (*types.Media, error) {
 	return c.UploadMediaImage(data)
 }
 
-func (c *Client) UploadMediaImages(dataList [][]byte) ([]*types.Media, error) {
+func (c *Client) UploadMediaImages(images [][]byte) ([]*types.Media, error) {
 	var (
 		medias = []*types.Media{}
 		mux    = new(sync.Mutex)
 		eg     = new(errgroup.Group)
 	)
 
-	for _, data := range dataList {
-		data := data
+	for _, image := range images {
+		image := image
 		eg.Go(func() error {
-			media, err := c.UploadMediaImage(data)
+			media, err := c.UploadMediaImage(image)
 			if err != nil {
 				return err
 			}
@@ -87,15 +87,15 @@ func (c *Client) UploadMediaImages(dataList [][]byte) ([]*types.Media, error) {
 	return medias, nil
 }
 
-func (c *Client) UploadMediaImage(data []byte) (*types.Media, error) {
+func (c *Client) UploadMediaImage(image []byte) (*types.Media, error) {
 	v := makeValues(nil)
-	v.Set("media_data", base64.StdEncoding.EncodeToString(data))
+	v.Set("media_data", base64.StdEncoding.EncodeToString(image))
 
 	media := &types.Media{}
 	return media, c.post(c.UploadBaseURL+"/media/upload.json", v, media)
 }
 
-func (c *Client) UploadMediaImageAsync(data []byte) (*types.Media, error) {
+func (c *Client) UploadMediaImageAsync(image []byte) (*types.Media, error) {
 	//TODO implement this
 	return nil, nil
 }
