@@ -3,8 +3,11 @@ package twitter
 import (
 	"encoding/base64"
 	"io/ioutil"
+	"strconv"
 	"sync"
+	"time"
 
+	"github.com/pkg/errors"
 	"github.com/utahta/go-twitter/types"
 	"golang.org/x/sync/errgroup"
 )
@@ -95,7 +98,109 @@ func (c *Client) UploadMediaImage(image []byte) (*types.Media, error) {
 	return media, c.post(c.UploadBaseURL+"/media/upload.json", v, media)
 }
 
-func (c *Client) UploadMediaImageAsync(image []byte) (*types.Media, error) {
-	//TODO implement this
-	return nil, nil
+func (c *Client) UploadMediaVideoURL(urlStr, mediaType string) (*types.Media, error) {
+	video, err := c.DownloadFile(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	return c.UploadMediaVideo(video, mediaType)
+}
+
+func (c *Client) UploadMediaVideo(video []byte, mediaType string) (*types.Media, error) {
+	return c.UploadLargeMedia(video, mediaType, MediaCategoryVideo)
+}
+
+const (
+	MediaCategoryImage = "tweet_image"
+	MediaCategoryGif   = "tweet_gif"
+	MediaCategoryVideo = "tweet_video"
+)
+
+// Upload large media file asynchronously
+func (c *Client) UploadLargeMedia(data []byte, mediaType, mediaCategory string) (*types.Media, error) {
+	totalBytes := len(data)
+
+	// media/upload INIT
+	v := makeValues(nil)
+	v.Set("command", "INIT")
+	v.Set("total_bytes", strconv.FormatInt(int64(totalBytes), 10))
+	v.Set("media_type", mediaType)
+	v.Set("media_category", mediaCategory)
+
+	media := &types.Media{}
+	if err := c.post(c.UploadBaseURL+"/media/upload.json", v, media); err != nil {
+		return nil, errors.Wrap(err, "failed to media/upload INIT")
+	}
+	c.Logger.Printf("media/upload INIT total_bytes:%v media_type:%v media_category:%v", totalBytes, mediaType, mediaCategory)
+
+	// media/upload APPEND
+	const mediaMaxLen = 5 * 1024 * 1024 // 5MB
+	segment := 0
+	for i := 0; i < totalBytes; i += mediaMaxLen {
+		var mediaData string
+		if i+mediaMaxLen < totalBytes {
+			mediaData = base64.StdEncoding.EncodeToString(data[i : i+mediaMaxLen])
+		} else {
+			mediaData = base64.StdEncoding.EncodeToString(data[i:])
+		}
+
+		v = makeValues(nil)
+		v.Set("command", "APPEND")
+		v.Set("media_id", media.MediaIDString)
+		v.Set("media_data", mediaData)
+		v.Set("segment_index", strconv.FormatInt(int64(segment), 10))
+
+		if err := c.post(c.UploadBaseURL+"/media/upload.json", v, nil); err != nil {
+			return nil, errors.Wrapf(err, "failed to media/upload APPEND segment:%v", segment)
+		}
+		c.Logger.Printf("media/upload APPEND media_id:%v segment_index:%v", media.MediaIDString, segment)
+
+		segment += 1
+	}
+
+	// media/upload FINALIZE
+	v = makeValues(nil)
+	v.Set("command", "FINALIZE")
+	v.Set("media_id", media.MediaIDString)
+
+	media = &types.Media{}
+	if err := c.post(c.UploadBaseURL+"/media/upload.json", v, media); err != nil {
+		return nil, errors.Wrap(err, "failed to media/upload FINALIZE")
+	}
+	c.Logger.Printf("media/upload FINALIZE media_id:%v state:%v check_after_secs:%v", media.MediaIDString, media.ProcessingInfo.State, media.ProcessingInfo.CheckAfterSecs)
+
+	// media/upload STATUS
+	eg := new(errgroup.Group)
+	eg.Go(func() error {
+		for {
+			if media.ProcessingInfo.State == "succeeded" {
+				break
+			} else if media.ProcessingInfo.State == "failed" {
+				return errors.Errorf(
+					"%v:%s:%s",
+					media.ProcessingInfo.Error.Code,
+					media.ProcessingInfo.Error.Name,
+					media.ProcessingInfo.Error.Message,
+				)
+			}
+			time.Sleep(time.Duration(media.ProcessingInfo.CheckAfterSecs) * time.Second)
+
+			v = makeValues(nil)
+			v.Set("command", "STATUS")
+			v.Set("media_id", media.MediaIDString)
+
+			media = &types.Media{}
+			if err := c.get(c.UploadBaseURL+"/media/upload.json", v, media); err != nil {
+				return err
+			}
+			c.Logger.Printf("media/upload STATUS media_id:%v state:%v check_after_secs:%v", media.MediaIDString, media.ProcessingInfo.State, media.ProcessingInfo.CheckAfterSecs)
+		}
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, errors.Wrap(err, "failed to media/upload STATUS")
+	}
+	c.Logger.Print("media/upload done")
+	return media, nil
 }

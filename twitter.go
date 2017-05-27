@@ -3,8 +3,10 @@ package twitter
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/garyburd/go-oauth/oauth"
 	"github.com/pkg/errors"
@@ -20,6 +22,7 @@ type Client struct {
 	Credentials   *oauth.Credentials
 	BaseURL       string
 	UploadBaseURL string
+	Logger        *log.Logger
 }
 
 type ClientOption func(*Client) error
@@ -44,6 +47,7 @@ func New(accessToken, accessTokenSecret string, options ...ClientOption) (*Clien
 		},
 		BaseURL:       BaseURL,
 		UploadBaseURL: UploadBaseURL,
+		Logger:        log.New(ioutil.Discard, "go-twitter:", log.LstdFlags),
 	}
 
 	for _, option := range options {
@@ -62,6 +66,13 @@ func WithHTTPClient(c *http.Client) ClientOption {
 	}
 }
 
+func WithDebug() ClientOption {
+	return func(client *Client) error {
+		client.Logger.SetOutput(os.Stdout)
+		return nil
+	}
+}
+
 // get issues a GET request to the Twitter API and decodes the response JSON to data.
 func (c *Client) get(urlStr string, form url.Values, data interface{}) error {
 	resp, err := oauthClient.Get(c.HTTPClient, c.Credentials, urlStr, form)
@@ -69,7 +80,7 @@ func (c *Client) get(urlStr string, form url.Values, data interface{}) error {
 		return err
 	}
 	defer resp.Body.Close()
-	return decodeResponse(resp, data)
+	return c.decodeResponse(resp, data)
 }
 
 // post issues a POST request to the Twitter API and decodes the response JSON to data.
@@ -79,19 +90,26 @@ func (c *Client) post(urlStr string, form url.Values, data interface{}) error {
 		return err
 	}
 	defer resp.Body.Close()
-	return decodeResponse(resp, data)
+	return c.decodeResponse(resp, data)
 }
 
 // decodeResponse decodes the JSON response from the Twitter API.
-func decodeResponse(resp *http.Response, data interface{}) error {
-	if resp.StatusCode != http.StatusOK {
-		p, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.Errorf("get %s returned status %d, %s", resp.Request.URL, resp.StatusCode, p)
+func (c *Client) decodeResponse(resp *http.Response, data interface{}) error {
+	c.Logger.Printf("decodeResponse: status:%v data:%T", resp.StatusCode, data)
+	if data == nil {
+		// without any content body (media/upload APPEND)
+		return nil
 	}
-	return json.NewDecoder(resp.Body).Decode(data)
+
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted {
+		return json.NewDecoder(resp.Body).Decode(data)
+	}
+
+	p, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return errors.Errorf("get %s returned status %d, %s", resp.Request.URL, resp.StatusCode, p)
 }
 
 func makeValues(v url.Values) url.Values {

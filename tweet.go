@@ -50,3 +50,23 @@ func (c *Client) TweetImages(msg string, images [][]byte, v url.Values) (*types.
 	}
 	return c.Tweet(msg, v)
 }
+
+func (c *Client) TweetVideoURL(msg string, urlStr, mediaType string, v url.Values) (*types.Tweets, error) {
+	v = makeValues(v)
+	media, err := c.UploadMediaVideoURL(urlStr, mediaType)
+	if err != nil {
+		return nil, err
+	}
+	v.Set("media_ids", media.MediaIDString)
+	return c.Tweet(msg, v)
+}
+
+func (c *Client) TweetVideo(msg string, video []byte, mediaType string, v url.Values) (*types.Tweets, error) {
+	v = makeValues(v)
+	media, err := c.UploadMediaVideo(video, mediaType)
+	if err != nil {
+		return nil, err
+	}
+	v.Set("media_ids", media.MediaIDString)
+	return c.Tweet(msg, v)
+}
