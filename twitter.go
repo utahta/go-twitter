@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -62,6 +63,13 @@ func New(accessToken, accessTokenSecret string, options ...ClientOption) (*Clien
 func WithHTTPClient(c *http.Client) ClientOption {
 	return func(client *Client) error {
 		client.HTTPClient = c
+		return nil
+	}
+}
+
+func WithLogger(w io.Writer) ClientOption {
+	return func(client *Client) error {
+		client.Logger.SetOutput(w)
 		return nil
 	}
 }
