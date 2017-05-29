@@ -1,8 +1,9 @@
 package twitter
 
 import (
+	"bytes"
 	"encoding/base64"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"sync"
 	"time"
@@ -19,11 +20,11 @@ func (c *Client) DownloadFile(urlStr string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, resp.Body); err != nil {
 		return nil, err
 	}
-	return data, nil
+	return buf.Bytes(), nil
 }
 
 func (c *Client) UploadMediaImageURLs(urlsStr []string) ([]*types.Media, error) {
