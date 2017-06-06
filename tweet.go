@@ -62,9 +62,9 @@ func (c *Client) TweetVideoURL(msg, urlStr, mediaType string, v url.Values) (*ty
 	return c.Tweet(msg, v)
 }
 
-func (c *Client) TweetVideo(msg string, video io.Reader, mediaType string, v url.Values) (*types.Tweets, error) {
+func (c *Client) TweetVideo(msg string, video io.Reader, length int, mediaType string, v url.Values) (*types.Tweets, error) {
 	v = makeValues(v)
-	media, err := c.UploadMediaVideo(video, mediaType)
+	media, err := c.UploadMediaVideo(video, length, mediaType)
 	if err != nil {
 		return nil, err
 	}

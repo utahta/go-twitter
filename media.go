@@ -13,12 +13,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (c *Client) DownloadFile(urlStr string) (io.ReadCloser, error) {
+func (c *Client) DownloadFile(urlStr string) (io.ReadCloser, int, error) {
 	resp, err := c.HTTPClient.Get(urlStr)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return resp.Body, nil
+	return resp.Body, int(resp.ContentLength), nil
 }
 
 func (c *Client) UploadMediaImageURLs(urlsStr []string) ([]*types.Media, error) {
@@ -50,7 +50,7 @@ func (c *Client) UploadMediaImageURLs(urlsStr []string) ([]*types.Media, error) 
 }
 
 func (c *Client) UploadMediaImageURL(urlStr string) (*types.Media, error) {
-	body, err := c.DownloadFile(urlStr)
+	body, _, err := c.DownloadFile(urlStr)
 	if err != nil {
 		return nil, err
 	}
@@ -105,17 +105,17 @@ func (c *Client) UploadMediaImage(image io.Reader) (*types.Media, error) {
 }
 
 func (c *Client) UploadMediaVideoURL(urlStr, mediaType string) (*types.Media, error) {
-	body, err := c.DownloadFile(urlStr)
+	body, length, err := c.DownloadFile(urlStr)
 	if err != nil {
 		return nil, err
 	}
 	defer body.Close()
 
-	return c.UploadMediaVideo(body, mediaType)
+	return c.UploadMediaVideo(body, length, mediaType)
 }
 
-func (c *Client) UploadMediaVideo(video io.Reader, mediaType string) (*types.Media, error) {
-	return c.UploadMediaAsync(video, mediaType, MediaCategoryVideo)
+func (c *Client) UploadMediaVideo(video io.Reader, length int, mediaType string) (*types.Media, error) {
+	return c.UploadMediaAsync(video, length, mediaType, MediaCategoryVideo)
 }
 
 const (
@@ -125,13 +125,28 @@ const (
 )
 
 // Upload large media file asynchronously
-func (c *Client) UploadMediaAsync(body io.Reader, mediaType, mediaCategory string) (*types.Media, error) {
+func (c *Client) UploadMediaAsync(body io.Reader, length int, mediaType, mediaCategory string) (*types.Media, error) {
+	if length <= 0 {
+		tmpBuff := &bytes.Buffer{}
+		if _, err := io.Copy(tmpBuff, body); err != nil {
+			return nil, err
+		}
+		length = tmpBuff.Len()
+		body = tmpBuff
+	}
+	totalBytes := length
+
+	// base64 encode
 	buff := &bytes.Buffer{}
-	if _, err := io.Copy(buff, body); err != nil {
+	encoder := base64.NewEncoder(base64.StdEncoding, buff)
+	if _, err := io.Copy(encoder, body); err != nil {
 		return nil, err
 	}
-	data := buff.Bytes()
-	totalBytes := len(data)
+	if err := encoder.Close(); err != nil {
+		return nil, err
+	}
+	data := buff.String()
+	dataLen := buff.Len()
 
 	// media/upload INIT
 	v := makeValues(nil)
@@ -149,12 +164,12 @@ func (c *Client) UploadMediaAsync(body io.Reader, mediaType, mediaCategory strin
 	// media/upload APPEND
 	const mediaMaxLen = 5 * 1024 * 1024 // 5MB
 	segment := 0
-	for i := 0; i < totalBytes; i += mediaMaxLen {
+	for i := 0; i < dataLen; i += mediaMaxLen {
 		var mediaData string
-		if i+mediaMaxLen < totalBytes {
-			mediaData = base64.StdEncoding.EncodeToString(data[i : i+mediaMaxLen])
+		if i+mediaMaxLen < dataLen {
+			mediaData = data[i : i+mediaMaxLen]
 		} else {
-			mediaData = base64.StdEncoding.EncodeToString(data[i:])
+			mediaData = data[i:]
 		}
 
 		v = makeValues(nil)
