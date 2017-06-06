@@ -1,6 +1,7 @@
 package twitter
 
 import (
+	"io"
 	"net/url"
 	"strings"
 
@@ -33,7 +34,7 @@ func (c *Client) TweetImageURLs(msg string, urlsStr []string, v url.Values) (*ty
 	return c.Tweet(msg, v)
 }
 
-func (c *Client) TweetImages(msg string, images [][]byte, v url.Values) (*types.Tweets, error) {
+func (c *Client) TweetImages(msg string, images []io.Reader, v url.Values) (*types.Tweets, error) {
 	v = makeValues(v)
 	medias, err := c.UploadMediaImages(images)
 	if err != nil {
@@ -51,7 +52,7 @@ func (c *Client) TweetImages(msg string, images [][]byte, v url.Values) (*types.
 	return c.Tweet(msg, v)
 }
 
-func (c *Client) TweetVideoURL(msg string, urlStr, mediaType string, v url.Values) (*types.Tweets, error) {
+func (c *Client) TweetVideoURL(msg, urlStr, mediaType string, v url.Values) (*types.Tweets, error) {
 	v = makeValues(v)
 	media, err := c.UploadMediaVideoURL(urlStr, mediaType)
 	if err != nil {
@@ -61,7 +62,7 @@ func (c *Client) TweetVideoURL(msg string, urlStr, mediaType string, v url.Value
 	return c.Tweet(msg, v)
 }
 
-func (c *Client) TweetVideo(msg string, video []byte, mediaType string, v url.Values) (*types.Tweets, error) {
+func (c *Client) TweetVideo(msg string, video io.Reader, mediaType string, v url.Values) (*types.Tweets, error) {
 	v = makeValues(v)
 	media, err := c.UploadMediaVideo(video, mediaType)
 	if err != nil {

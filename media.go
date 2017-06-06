@@ -13,18 +13,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (c *Client) DownloadFile(urlStr string) ([]byte, error) {
+func (c *Client) DownloadFile(urlStr string) (io.ReadCloser, error) {
 	resp, err := c.HTTPClient.Get(urlStr)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, resp.Body); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return resp.Body, nil
 }
 
 func (c *Client) UploadMediaImageURLs(urlsStr []string) ([]*types.Media, error) {
@@ -56,14 +50,16 @@ func (c *Client) UploadMediaImageURLs(urlsStr []string) ([]*types.Media, error) 
 }
 
 func (c *Client) UploadMediaImageURL(urlStr string) (*types.Media, error) {
-	data, err := c.DownloadFile(urlStr)
+	body, err := c.DownloadFile(urlStr)
 	if err != nil {
 		return nil, err
 	}
-	return c.UploadMediaImage(data)
+	defer body.Close()
+
+	return c.UploadMediaImage(body)
 }
 
-func (c *Client) UploadMediaImages(images [][]byte) ([]*types.Media, error) {
+func (c *Client) UploadMediaImages(images []io.Reader) ([]*types.Media, error) {
 	var (
 		medias = []*types.Media{}
 		mux    = new(sync.Mutex)
@@ -91,24 +87,35 @@ func (c *Client) UploadMediaImages(images [][]byte) ([]*types.Media, error) {
 	return medias, nil
 }
 
-func (c *Client) UploadMediaImage(image []byte) (*types.Media, error) {
+func (c *Client) UploadMediaImage(image io.Reader) (*types.Media, error) {
+	buff := &bytes.Buffer{}
+	encoder := base64.NewEncoder(base64.StdEncoding, buff)
+	if _, err := io.Copy(encoder, image); err != nil {
+		return nil, err
+	}
+	if err := encoder.Close(); err != nil {
+		return nil, err
+	}
+
 	v := makeValues(nil)
-	v.Set("media_data", base64.StdEncoding.EncodeToString(image))
+	v.Set("media_data", buff.String())
 
 	media := &types.Media{}
 	return media, c.post(c.UploadBaseURL+"/media/upload.json", v, media)
 }
 
 func (c *Client) UploadMediaVideoURL(urlStr, mediaType string) (*types.Media, error) {
-	video, err := c.DownloadFile(urlStr)
+	body, err := c.DownloadFile(urlStr)
 	if err != nil {
 		return nil, err
 	}
-	return c.UploadMediaVideo(video, mediaType)
+	defer body.Close()
+
+	return c.UploadMediaVideo(body, mediaType)
 }
 
-func (c *Client) UploadMediaVideo(video []byte, mediaType string) (*types.Media, error) {
-	return c.UploadLargeMedia(video, mediaType, MediaCategoryVideo)
+func (c *Client) UploadMediaVideo(video io.Reader, mediaType string) (*types.Media, error) {
+	return c.UploadMediaAsync(video, mediaType, MediaCategoryVideo)
 }
 
 const (
@@ -118,7 +125,12 @@ const (
 )
 
 // Upload large media file asynchronously
-func (c *Client) UploadLargeMedia(data []byte, mediaType, mediaCategory string) (*types.Media, error) {
+func (c *Client) UploadMediaAsync(body io.Reader, mediaType, mediaCategory string) (*types.Media, error) {
+	buff := &bytes.Buffer{}
+	if _, err := io.Copy(buff, body); err != nil {
+		return nil, err
+	}
+	data := buff.Bytes()
 	totalBytes := len(data)
 
 	// media/upload INIT
