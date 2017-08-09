@@ -5,20 +5,39 @@ import (
 	"encoding/base64"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/utahta/go-twitter/types"
 	"golang.org/x/sync/errgroup"
 )
 
 func (c *Client) DownloadFile(urlStr string) (io.ReadCloser, int, error) {
-	resp, err := c.HTTPClient.Get(urlStr)
-	if err != nil {
-		return nil, 0, err
-	}
-	return resp.Body, int(resp.ContentLength), nil
+	var (
+		body          io.ReadCloser
+		contentLength int
+		err           error
+	)
+
+	err = backoff.Retry(func() error {
+		resp, err := c.HTTPClient.Get(urlStr)
+		if err != nil {
+			return err
+		}
+
+		ct := resp.Header.Get("Content-Type")
+		if strings.Contains(ct, "image") || strings.Contains(ct, "video") {
+			body = resp.Body
+			contentLength = int(resp.ContentLength)
+			return nil
+		}
+		return errors.Errorf("Detected invalid content type. ct:%v", ct)
+	}, backoff.WithMaxTries(backoff.NewExponentialBackOff(), 3))
+
+	return body, contentLength, err
 }
 
 func (c *Client) UploadMediaImageURLs(urlsStr []string) ([]*types.Media, error) {
