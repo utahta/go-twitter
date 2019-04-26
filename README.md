@@ -16,6 +16,12 @@ Go client library for the [Twitter REST APIs v1.1](https://dev.twitter.com/rest/
 go get github.com/utahta/go-twitter
 ```
 
+#### Enable modules (go v1.11+)
+```
+export GO111MODULE=on
+go mod init
+```
+
 ## Contributing
 
 1. Fork it ( https://github.com/utahta/go-twitter/fork )

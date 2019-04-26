@@ -8,7 +8,8 @@ import (
 	"github.com/utahta/go-twitter"
 )
 
-// Example file uploader. Set all credentials, set image to be downloaded and attached to tweet.
+// Example file uploader. Set all mandatory credentials, define the image to be downloaded and attached to tweet and
+// create the tweet with file attachment
 func main() {
 
 	twitter.SetConsumerCredentials(os.Getenv("CONSUMER_KEY"), os.Getenv("CONSUMER_SECRET"))
