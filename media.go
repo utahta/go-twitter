@@ -35,14 +35,14 @@ func (c *Client) DownloadFile(urlStr string) (io.ReadCloser, int, error) {
 			return nil
 		}
 		return errors.Errorf("Detected invalid content type. ct:%v", ct)
-	}, backoff.WithMaxTries(backoff.NewExponentialBackOff(), 3))
+	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3))
 
 	return body, contentLength, err
 }
 
 func (c *Client) UploadMediaImageURLs(urlsStr []string) ([]*types.Media, error) {
 	var (
-		medias = []*types.Media{}
+		medias = make([]*types.Media, 0)
 		mux    = new(sync.Mutex)
 		eg     = new(errgroup.Group)
 	)
@@ -80,7 +80,7 @@ func (c *Client) UploadMediaImageURL(urlStr string) (*types.Media, error) {
 
 func (c *Client) UploadMediaImages(images []io.Reader) ([]*types.Media, error) {
 	var (
-		medias = []*types.Media{}
+		medias = make([]*types.Media, 0)
 		mux    = new(sync.Mutex)
 		eg     = new(errgroup.Group)
 	)
